@@ -1,3 +1,0 @@
-falcon
-peewee
-Jinja2

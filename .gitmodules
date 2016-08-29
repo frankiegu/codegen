@@ -1,0 +1,6 @@
+[submodule "python/code"]
+	path = python/code
+	url = git://github.com/xiaomatech/falcon.git
+[submodule "php/code"]
+	path = php/code
+	url = git://github.com/xiaomatech/yaf.git

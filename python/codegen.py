@@ -122,9 +122,21 @@ class Generator:
     def gen_controllers(self):
         controllers_dir = output_dir + '/controllers/'
 
+    def gen_controller(self,table):
+        pass
+
     #list include curd form views
     def gen_views(self):
         views_dir = output_dir + '/views/'
+
+    def gen_view(self,table):
+        pass
+
+    def gen_forms(self):
+        pass
+
+    def gen_form(self,table):
+        pass
 
     def gen_tables(self):
         class_list = []
