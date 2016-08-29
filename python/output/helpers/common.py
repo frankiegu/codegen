@@ -14,6 +14,16 @@ import multiprocessing
 import requests
 import hashlib
 
+def exec_cmd(cmd):
+    p = Popen(cmd,shell=True,stdout=PIPE,stderr=PIPE)
+    try:
+        stdout, stderr = p.communicate()
+    finally:
+        subprocess._cleanup()
+        p.stdout.close()
+        p.stderr.close()
+    rc = p.returncode
+    return rc,stdout,stderr
 
 def ansible_run(**post_data):
     playbook = post_data.get('playbook')

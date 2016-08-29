@@ -3,16 +3,6 @@
 
 autoloader_dir = ['controllers']  #['library','helpers','models','controllers']
 
-common_db_config = {
-    'host': '127.0.0.1',
-    'port': 3306,
-    'user': 'root',
-    'password': '',
-    #'max_connections': 100,
-    #'charset':'utf8mb4',
-    #'threadlocals':True
-}
-
 redis_conf = {
     'host': '127.0.0.1',
     'port': 6379,
