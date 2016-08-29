@@ -9,4 +9,5 @@ mkdir -p /data
 
 cd /data
 git clone git://github.com/xiaomatech/codegen.git
+git submodule update --init --recursive
 
