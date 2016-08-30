@@ -96,20 +96,20 @@ class Generator:
   </form>
 {% endblock %}
 '''
-        self.form_header = '''
-# -*- coding: utf-8 -*-
-import wtforms
-from wtforms.fields.core import *
-from wtforms.fields.simple import *
-from wtforms.fields.html5 import *
-from wtforms import Form, validators
-
-        '''
-        self.form_template = """
-class {{ class_name }}Form(Form):
-    {% for field in class_fields %}
-    {{ field.name }} = {{ field.type_}}(validators=[validators.InputRequired()])
-    {% endfor %}"""
+#         self.form_header = '''
+# # -*- coding: utf-8 -*-
+# import wtforms
+# from wtforms.fields.core import *
+# from wtforms.fields.simple import *
+# from wtforms.fields.html5 import *
+# from wtforms import Form, validators
+#
+#         '''
+#         self.form_template = """
+# class {{ class_name }}Form(Form):
+#     {% for field in class_fields %}
+#     {{ field.name }} = {{ field.type_}}(validators=[validators.InputRequired()])
+#     {% endfor %}"""
         self.controller_template = """# -*- coding:utf8 -*-
 import falcon
 from falcon import Request
@@ -236,23 +236,23 @@ class {{ table_name }}:
         with open(view_file, 'w+') as fout:
             fout.writelines(content)
 
-    def gen_forms(self):
-        for table in self.table_data:
-            model_name = self.table_data.get(table).get('class_name')
-            self.gen_form(table,model_name)
-
-    def gen_form(self,table,model_name):
-        form_file = output_dir + '/forms/' + table + '.py'
-        form_fields = []
-        fields = self.table_data.get(table)
-        for item in fields['fields']:
-            field_name = item.keys()[0]
-            field_type = field_type_to_wtforms[item[field_name]['raw_column_type']].__name__
-            form_fields.append({'name': field_name, 'type_': field_type})
-        if os.path.exists(os.path.dirname(form_file)) is False:
-            os.makedirs(os.path.dirname(form_file))
-        with open(form_file,'w+') as fout:
-            fout.writelines(self.render(model_name,form_fields))
+    # def gen_forms(self):
+    #     for table in self.table_data:
+    #         model_name = self.table_data.get(table).get('class_name')
+    #         self.gen_form(table,model_name)
+    #
+    # def gen_form(self,table,model_name):
+    #     form_file = output_dir + '/forms/' + table + '.py'
+    #     form_fields = []
+    #     fields = self.table_data.get(table)
+    #     for item in fields['fields']:
+    #         field_name = item.keys()[0]
+    #         field_type = field_type_to_wtforms[item[field_name]['raw_column_type']].__name__
+    #         form_fields.append({'name': field_name, 'type_': field_type})
+    #     if os.path.exists(os.path.dirname(form_file)) is False:
+    #         os.makedirs(os.path.dirname(form_file))
+    #     with open(form_file,'w+') as fout:
+    #         fout.writelines(self.render(model_name,form_fields))
 
     def render(self, table, form_fields):
         t = Template(self.form_header + self.form_template)
