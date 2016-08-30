@@ -1,5 +1,5 @@
 falcon
 peewee
 wtforms
-wtf-peewee
+peewee-validates
 Jinja2

@@ -124,67 +124,75 @@ def exec_cmd(cmd):
     rc = p.returncode
     return rc, stdout, stderr
 
-
 class Generator:
     def __init__(self,db):
         self.db = db
         self.table_data = self.gen_tables()
-        self.introspector = Introspector.from_database(self.db)
-        self.database = self.introspector.introspect()
         self.form_header = '''
-            # -*- coding: utf-8 -*-
-            import wtforms
-            from wtforms.fields.core import *
-            from wtforms.fields.simple import *
-            from wtforms.fields.html5 import *
-            from wtforms import Form, validators
+# -*- coding: utf-8 -*-
+import wtforms
+from wtforms.fields.core import *
+from wtforms.fields.simple import *
+from wtforms.fields.html5 import *
+from wtforms import Form, validators
+from peewee_validates import ModelValidator
+from peewee_validates import Validator, Field
+class {{ class_name }}Validator(Validator):
+    {% for field in class_fields %}
+    {{ field.name }} = Field(required=True)
+    {% endfor %}
+
         '''
         self.form_template = """
-        class {{ class_name }}(Form):
-            {% for field in class_fields %}{{ field.name }} = {{ field.type_}}(validators=[validators.InputRequired()])
-            {% endfor %}
+class {{ class_name }}(Form):
+    {% for field in class_fields %}
+    {{ field.name }} = {{ field.type_}}(validators=[validators.InputRequired()])
+    {% endfor %}"""
+        self.controller_template = """
+from models.{{ db_name }} import *
+from helpers.logger import *
+from helpers.cache import *
+
+class {{ table_name }}:
+    def __init__(self):
+        pass
+
+    def create_{{ table_name }}(self,req,resp):
+        template = env.get_template('templates/{{ table_name }}/form.html')
+        form = {{ model_name }}Form(req._params)
+        items = {{ model_name }}.select()
+        if request.method == 'POST':
+            if form.validate():
+                new_item = {{ model_name }}.create(**form.data)
+                form = {{ model_name }}Form()
+        return template.render(items=items, form=form)
+
+    def info_{{ table_name }}(self,req,resp):
+        item = {{ model_name }}.get({{ model_name}}.id == {{ table_name }}_id)
+        return render_template('templates/{{ table_name }}/view.html', item=item)
+
+    def edit_{{ table_name }}(self,req,resp):
+        item = {{ model_name }}.get({{ model_name }}.id == {{ table_name }}_id)
+
+        form = {{ model_name }}Form(req._params)
+        if form.validate():
+            for attr, value in form.data.iteritems():
+                setattr(item, attr, value)
+            item.save()
+            redirect('/list_{{ table_name }}')
+
+        items = {{ model_name }}.select()
+        template = env.get_template('templates/{{ table_name }}/form.html')
+        return template.render(items=items, form=form)
+
+    def delete_{{ table_name }}(self,req,resp):
+        item = {{ model_name }}.get({{ model_name }}.id == {{ table_name }}_id)
+        item.delete_instance()
+        return json.dumps({
+            'status': 'success',
+            'message': 'Item was deleted'
+        })
         """
-        self.controller_template = '''
-            def create_{{ view_name }}():
-                template = env.get_template('gen_views/{{ view_name }}_admin.html')
-                form = {{ peewee_model }}Form(request.POST)
-                items = {{ peewee_model }}.select()
-                if request.method == 'POST':
-                    if form.validate():
-                        new_item = {{ peewee_model }}.create(**form.data)
-                        form = {{ peewee_model }}Form()
-                return template.render(items=items, form=form)
-
-
-            def info_{{ view_name }}({{ view_name }}_id):
-                item = {{ peewee_model }}.get_or_404({{ peewee_model}}.id == {{ view_name }}_id)
-                return render_template('gen_views/{{ views_name }}_view.html', item=item)
-
-            def edit_{{ view_name }}({{ view_name }}_id):
-                item = {{ peewee_model }}.get_or_404({{ peewee_model }}.id == {{ view_name }}_id)
-                if request.method == 'GET':
-                    return json.dumps(item, cls=PeeweeModelEncoder)
-
-                form = {{ peewee_model }}Form(request.POST)
-                if form.validate():
-                    for attr, value in form.data.iteritems():
-                        setattr(item, attr, value)
-                    item.save()
-                    redirect('/{{ view_name }}_admin')
-
-                items = {{ peewee_model }}.select()
-                template = env.get_template('gen_views/{{ view_name }}_admin.html')
-                return template.render(items=items, form=form)
-
-
-            def delete_{{ view_name }}({{ view_name }}_id):
-                item = {{ peewee_model }}.get({{ peewee_model }}.id == {{ view_name }}_id)
-                item.delete_instance()
-                return json.dumps({
-                    'status': 'success',
-                    'message': 'Item was deleted'
-                })
-        '''
     def gen_models(self):
         models_dir = output_dir + '/models/'
         models_file = models_dir + db_name + '.py'
@@ -216,33 +224,37 @@ class Generator:
         controllers_dir = output_dir + '/controllers/'
 
 
-    def gen_controller(self,table):
-        peewee_model = ''
+    def gen_controller(self,table,model):
         t = Template(self.controller_template)
-        controller_content = t.render(view_name=table,
-                               peewee_model=peewee_model)
+        controller_content = t.render(db_name=db_name,table_name=table,
+                                      model_name=model)
         return controller_content
 
     #list include curd form views
     def gen_views(self):
         views_dir = output_dir + '/views/'
 
-    def gen_view(self,table):
+    def gen_view(self,table,model):
         pass
 
     def gen_forms(self):
-        pass
+        for table in self.table_data:
+	    model_name = self.table_data.get(table).get('class_name')
+	    self.gen_form(table,model_name)
 
-    def gen_form(self,table):
+    def gen_form(self,table,model_name):
         form_file = output_dir + '/views/' + table + '/' + 'form.html'
         form_fields = []
-        fields = self.table_data[table]
+	import sys
+        fields = self.table_data.get(table)
         for item in fields['fields']:
-            field_name = item['field_name']
-            field_type = field_type_to_wtforms[item['raw_column_type']].__name__
+            field_name = item.keys()[0]
+            field_type = field_type_to_wtforms[item[field_name]['raw_column_type']].__name__
             form_fields.append({'name': field_name, 'type_': field_type})
-        with open(fj(form_file, 'aw+')) as fout:
-            fout.writelines(self.render(table,form_fields))
+	if os.path.exists(form_file) is False:
+	    os.makedirs(os.path.dirname(form_file))
+        with open(form_file,'w+') as fout:
+            fout.writelines(self.render(model_name,form_fields))
 
     def render(self,table,form_fields):
         t = Template(self.form_header + '\n\n' + self.form_template)
@@ -251,17 +263,19 @@ class Generator:
     def gen_tables(self):
         class_list = []
         table_list = []
-        result = []
-        for table in sorted(self.database.model_names.values()):
+        result = {}
+	introspector = Introspector.from_database(self.db)
+        database = introspector.introspect()
+        for table in sorted(database.model_names.values()):
             class_list.append(table)
-        for table in sorted(self.database.model_names.keys()):
+        for table in sorted(database.model_names.keys()):
             table_list.append(table)
         for table,class_name in itertools.izip(table_list,class_list):
             item = {}
             item['class_name'] = class_name
-            columns = self.database.columns[table]
+            columns = database.columns[table]
 
-            foreign_keys = self.database.foreign_keys[table]
+            foreign_keys = database.foreign_keys[table]
             foreign_key_item = []
             for foreign_key in foreign_keys:
                 dest_table = foreign_key.dest_table
@@ -284,5 +298,8 @@ class Generator:
                         field['default'] = res[5]
                         field['raw_types'] = res[1]
             item['fields'] = sorted(field_item)
-            result.append({table:item})
+            result.update({table:item})
         return result
+
+g = Generator(db)
+g.gen_forms()
