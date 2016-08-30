@@ -10,6 +10,8 @@ db_config = {
 
 db_name = 'cmdb'
 
+output_dir = './output'
+
 import subprocess
 from subprocess import Popen, PIPE
 import functools
@@ -19,6 +21,9 @@ import itertools
 import shutil
 import peewee
 import wtforms
+from wtforms.fields.core import *
+from wtforms.fields.simple import *
+from wtforms.fields.html5 import *
 import inspect
 import pyclbr
 import importlib
@@ -32,9 +37,44 @@ env = Environment(loader=FileSystemLoader('views'))
 db = MySQLDatabase(db_name, **db_config)
 conn = MySQLdb.connect(host=db_config.get('host'),user=db_config.get('user'),passwd=db_config.get('password'),db=db_name)
 cursor = conn.cursor()
+'''
+ 'FieldList','FormField',  'RadioField', 'SelectField','SelectMultipleField', 'URLField', 'PasswordField', 'FileField', 'MultipleFileField','HiddenField', 'SubmitField',
+'DateTimeLocalField','DecimalRangeField', 'EmailField',  'IntegerRangeField','SearchField', 'TelField'
+'''
+field_type_to_wtforms = {
+    'char': StringField,
+    'varchar':StringField,
+    'longtext':TextAreaField,
+    'mediumtext':TextAreaField,
+    'text':TextAreaField,
+    'tinytext':TextAreaField,
+    'tinyblob':TextAreaField,
+    'blob':TextAreaField,
+    'longblob':TextAreaField,
+    'varbinary':TextAreaField,
+    'binary':TextAreaField,
 
-output_dir = './output'
+    'int': IntegerField,
+    'tinyint':IntegerField,
+    'smallint':IntegerField,
+    'mediumint':IntegerField,
+    'bigint':IntegerField,
+    'numeric':IntegerField,
+    'decimal':DecimalField,
+    'double':FloatField,
+    'float':FloatField,
 
+    'bool': BooleanField,
+    'boolean': BooleanField,
+
+    'enum':SelectField,
+    'set':SelectMultipleField,
+
+    'datetime': DateTimeField,
+    'date': DateField,
+    'timestamp': DateTimeField,
+    'time': DateTimeField,
+}
 
 def render_template(tpl_name, *args, **kwagrs):
     """
@@ -91,7 +131,60 @@ class Generator:
         self.table_data = self.gen_tables()
         self.introspector = Introspector.from_database(self.db)
         self.database = self.introspector.introspect()
+        self.form_header = '''
+            # -*- coding: utf-8 -*-
+            import wtforms
+            from wtforms.fields.core import *
+            from wtforms.fields.simple import *
+            from wtforms.fields.html5 import *
+            from wtforms import Form, validators
+        '''
+        self.form_template = """
+        class {{ class_name }}(Form):
+            {% for field in class_fields %}{{ field.name }} = {{ field.type_}}(validators=[validators.InputRequired()])
+            {% endfor %}
+        """
+        self.controller_template = '''
+            def create_{{ view_name }}():
+                template = env.get_template('gen_views/{{ view_name }}_admin.html')
+                form = {{ peewee_model }}Form(request.POST)
+                items = {{ peewee_model }}.select()
+                if request.method == 'POST':
+                    if form.validate():
+                        new_item = {{ peewee_model }}.create(**form.data)
+                        form = {{ peewee_model }}Form()
+                return template.render(items=items, form=form)
 
+
+            def info_{{ view_name }}({{ view_name }}_id):
+                item = {{ peewee_model }}.get_or_404({{ peewee_model}}.id == {{ view_name }}_id)
+                return render_template('gen_views/{{ views_name }}_view.html', item=item)
+
+            def edit_{{ view_name }}({{ view_name }}_id):
+                item = {{ peewee_model }}.get_or_404({{ peewee_model }}.id == {{ view_name }}_id)
+                if request.method == 'GET':
+                    return json.dumps(item, cls=PeeweeModelEncoder)
+
+                form = {{ peewee_model }}Form(request.POST)
+                if form.validate():
+                    for attr, value in form.data.iteritems():
+                        setattr(item, attr, value)
+                    item.save()
+                    redirect('/{{ view_name }}_admin')
+
+                items = {{ peewee_model }}.select()
+                template = env.get_template('gen_views/{{ view_name }}_admin.html')
+                return template.render(items=items, form=form)
+
+
+            def delete_{{ view_name }}({{ view_name }}_id):
+                item = {{ peewee_model }}.get({{ peewee_model }}.id == {{ view_name }}_id)
+                item.delete_instance()
+                return json.dumps({
+                    'status': 'success',
+                    'message': 'Item was deleted'
+                })
+        '''
     def gen_models(self):
         models_dir = output_dir + '/models/'
         models_file = models_dir + db_name + '.py'
@@ -122,8 +215,13 @@ class Generator:
     def gen_controllers(self):
         controllers_dir = output_dir + '/controllers/'
 
+
     def gen_controller(self,table):
-        pass
+        peewee_model = ''
+        t = Template(self.controller_template)
+        controller_content = t.render(view_name=table,
+                               peewee_model=peewee_model)
+        return controller_content
 
     #list include curd form views
     def gen_views(self):
@@ -136,7 +234,19 @@ class Generator:
         pass
 
     def gen_form(self,table):
-        pass
+        form_file = output_dir + '/views/' + table + '/' + 'form.html'
+        form_fields = []
+        fields = self.table_data[table]
+        for item in fields['fields']:
+            field_name = item['field_name']
+            field_type = field_type_to_wtforms[item['raw_column_type']].__name__
+            form_fields.append({'name': field_name, 'type_': field_type})
+        with open(fj(form_file, 'aw+')) as fout:
+            fout.writelines(self.render(table,form_fields))
+
+    def render(self,table,form_fields):
+        t = Template(self.form_header + '\n\n' + self.form_template)
+        return t.render(class_name=table, class_fields=form_fields)
 
     def gen_tables(self):
         class_list = []
