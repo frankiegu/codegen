@@ -26,7 +26,7 @@ from wtforms.fields.simple import *
 from wtforms.fields.html5 import *
 import inspect
 import pyclbr
-import importlib
+import time
 import MySQLdb
 from playhouse.reflection import Introspector
 from peewee import *
@@ -53,7 +53,6 @@ field_type_to_wtforms = {
     'longblob':TextAreaField,
     'varbinary':TextAreaField,
     'binary':TextAreaField,
-
     'int': IntegerField,
     'tinyint':IntegerField,
     'smallint':IntegerField,
@@ -100,19 +99,6 @@ def view(template_name):
 
     return decorator
 
-def compile_module(module_file,**kwargs):
-    with open(module_file, 'r') as fin:
-        template = fin.read()
-
-    with open(module_file, 'w') as fout:
-        jinja_template = Template(template)
-        result = jinja_template.render(kwargs)
-        fout.write(result)
-
-
-fj = os.path.join  # Folder join
-
-
 def exec_cmd(cmd):
     p = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
     try:
@@ -144,14 +130,17 @@ class {{ class_name }}Validator(Validator):
 
         '''
         self.form_template = """
-class {{ class_name }}(Form):
+class {{ class_name }}Form(Form):
     {% for field in class_fields %}
     {{ field.name }} = {{ field.type_}}(validators=[validators.InputRequired()])
     {% endfor %}"""
         self.controller_template = """
-from models.{{ db_name }} import *
+from models.{{ table_name }} import *
+from forms.{{ table_name }} import *
 from helpers.logger import *
 from helpers.cache import *
+from jinja2 import Environment, FileSystemLoader
+env = Environment(loader=FileSystemLoader('views'))
 
 class {{ table_name }}:
     def __init__(self):
@@ -179,7 +168,7 @@ class {{ table_name }}:
             for attr, value in form.data.iteritems():
                 setattr(item, attr, value)
             item.save()
-            redirect('/list_{{ table_name }}')
+            redirect('/{{ table_name }}/list_{{ table_name }}')
 
         items = {{ model_name }}.select()
         template = env.get_template('templates/{{ table_name }}/form.html')
@@ -191,24 +180,29 @@ class {{ table_name }}:
         return json.dumps({
             'status': 'success',
             'message': 'Item was deleted'
-        })
-        """
+        })"""
     def gen_models(self):
+	for table in self.table_data:
+            self.gen_model(table)
+	
+    def gen_model(self,table):
         models_dir = output_dir + '/models/'
-        models_file = models_dir + db_name + '.py'
-        if db_config.get('password') != '':
-            cmd = '''python -m pwiz -e mysql -u%s -H%s -P%s -p%s %s > %s''' % (
+        model_file = models_dir + table + '.py'
+        if os.path.exists(models_dir) is False:
+            os.makedirs(models_dir)
+	if db_config.get('password') != '':
+            cmd = '''python -m pwiz -e mysql -u%s -H%s -P%s -p%s -t %s %s> %s''' % (
                 db_config.get('user'), db_config.get('host'),
-                db_config.get('password'), db_config.get('port'), db_name,
-                models_file)
+                db_config.get('password'), db_config.get('port'),table, db_name,model_file)
         else:
-            cmd = '''python -m pwiz -e mysql -u%s -H%s -p%s %s > %s''' % (
+            cmd = '''python -m pwiz -e mysql -u%s -H%s -p%s -t %s %s> %s''' % (
                 db_config.get('user'), db_config.get('host'),
-                db_config.get('port'), db_name, models_file)
+                db_config.get('port'), table,db_name,model_file)
         rc, stdout, stderr = exec_cmd(cmd)
         if rc != 0:
             print 'generator models error ,%s' % stderr
         else:
+	    return ''
             db_conf_file = output_dir + '/configs/db.py'
             with open(db_conf_file,'w+') as fp:
                 fp.write('db_config = %s' % json.dumps(db_config))
@@ -221,14 +215,19 @@ class {{ table_name }}:
 
     #admin & resutful
     def gen_controllers(self):
-        controllers_dir = output_dir + '/controllers/'
+	for table in self.table_data:
+            model_name = self.table_data.get(table).get('class_name')
+            self.gen_controller(table,model_name)
 
-
-    def gen_controller(self,table,model):
+    def gen_controller(self,table,model_name):
+	controller_file = output_dir + '/controllers/' + table
         t = Template(self.controller_template)
-        controller_content = t.render(db_name=db_name,table_name=table,
-                                      model_name=model)
-        return controller_content
+        controller_content = t.render(table_name=table,
+                                      model_name=model_name)
+	if os.path.exists(os.path.dirname(controller_file)) is False:
+            os.makedirs(os.path.dirname(controller_file))
+	with open(controller_file,'w+') as fout:
+            fout.writelines(controller_content)
 
     #list include curd form views
     def gen_views(self):
@@ -243,7 +242,7 @@ class {{ table_name }}:
 	    self.gen_form(table,model_name)
 
     def gen_form(self,table,model_name):
-        form_file = output_dir + '/views/' + table + '/' + 'form.html'
+        form_file = output_dir + '/forms/' + table + '.py'
         form_fields = []
 	import sys
         fields = self.table_data.get(table)
@@ -251,7 +250,7 @@ class {{ table_name }}:
             field_name = item.keys()[0]
             field_type = field_type_to_wtforms[item[field_name]['raw_column_type']].__name__
             form_fields.append({'name': field_name, 'type_': field_type})
-	if os.path.exists(form_file) is False:
+	if os.path.exists(os.path.dirname(form_file)) is False:
 	    os.makedirs(os.path.dirname(form_file))
         with open(form_file,'w+') as fout:
             fout.writelines(self.render(model_name,form_fields))
@@ -302,4 +301,6 @@ class {{ table_name }}:
         return result
 
 g = Generator(db)
+g.gen_models()
 g.gen_forms()
+g.gen_controllers()
