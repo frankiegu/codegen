@@ -18,17 +18,13 @@ import os
 import json
 import itertools
 import shutil
-import wtforms
-from wtforms.fields.core import *
-from wtforms.fields.simple import *
-from wtforms.fields.html5 import *
 import pyclbr
 import time
 import MySQLdb
 from playhouse.reflection import Introspector
 from peewee import *
 from jinja2 import Template
-from wtfpeewee.orm import model_form
+from wtfpeewee.orm import model_form,ModelConverter
 
 db = MySQLDatabase(db_name, **db_config)
 conn = MySQLdb.connect(host=db_config.get('host'),
@@ -36,40 +32,6 @@ conn = MySQLdb.connect(host=db_config.get('host'),
                        passwd=db_config.get('password'),
                        db=db_name)
 cursor = conn.cursor()
-'''
- 'FieldList','FormField',  'RadioField', 'SelectField','SelectMultipleField', 'URLField', 'PasswordField', 'FileField', 'MultipleFileField','HiddenField', 'SubmitField',
-'DateTimeLocalField','DecimalRangeField', 'EmailField',  'IntegerRangeField','SearchField', 'TelField'
-'''
-field_type_to_wtforms = {
-    'char': StringField,
-    'varchar': StringField,
-    'longtext': TextAreaField,
-    'mediumtext': TextAreaField,
-    'text': TextAreaField,
-    'tinytext': TextAreaField,
-    'tinyblob': TextAreaField,
-    'blob': TextAreaField,
-    'longblob': TextAreaField,
-    'varbinary': TextAreaField,
-    'binary': TextAreaField,
-    'int': IntegerField,
-    'tinyint': IntegerField,
-    'smallint': IntegerField,
-    'mediumint': IntegerField,
-    'bigint': IntegerField,
-    'numeric': IntegerField,
-    'decimal': DecimalField,
-    'double': FloatField,
-    'float': FloatField,
-    'bool': BooleanField,
-    'boolean': BooleanField,
-    'enum': SelectField,
-    'set': SelectMultipleField,
-    'datetime': DateTimeField,
-    'date': DateField,
-    'timestamp': DateTimeField,
-    'time': DateTimeField,
-}
 
 def exec_cmd(cmd):
     p = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
@@ -96,24 +58,8 @@ class Generator:
   </form>
 {% endblock %}
 '''
-#         self.form_header = '''
-# # -*- coding: utf-8 -*-
-# import wtforms
-# from wtforms.fields.core import *
-# from wtforms.fields.simple import *
-# from wtforms.fields.html5 import *
-# from wtforms import Form, validators
-#
-#         '''
-#         self.form_template = """
-# class {{ class_name }}Form(Form):
-#     {% for field in class_fields %}
-#     {{ field.name }} = {{ field.type_}}(validators=[validators.InputRequired()])
-#     {% endfor %}"""
         self.controller_template = """# -*- coding:utf8 -*-
 import falcon
-from falcon import Request
-from falcon import Response
 from models.{{ db_name }} import *
 from wtfpeewee.orm import model_form
 from helpers.logger import *
@@ -124,41 +70,43 @@ env = Environment(loader=FileSystemLoader('views'))
 {{ model_name }}Form = model_form({{ model_name }})
 
 class {{ table_name }}:
-    def __init__(self):
-        pass
+    def index(self,req,resp):
+        template = env.get_template('views/{{ table_name }}.html')
+        return template.render()
 
-    def create_{{ table_name }}(self,req,resp):
-        template = env.get_template('templates/{{ table_name }}/form.html')
+    def create(self,req,resp):
         form = {{ model_name }}Form(req._params)
-        items = {{ model_name }}.select()
-        if request.method == 'POST':
+        if req.method == 'POST':
             if form.validate():
                 new_item = {{ model_name }}.create(**form.data)
-                form = {{ model_name }}Form()
-        return template.render(items=items, form=form)
+                return 'sucess'
+            else:
 
-    def info_{{ table_name }}(self,req,resp):
+        else:
+            raise falcon.HTTPMethodNotAllowed(['POST'])
+
+    def info(self,req,resp):
         item = {{ model_name }}.get({{ model_name}}.id == {{ table_name }}_id)
-        return render_template('templates/{{ table_name }}/view.html', item=item)
+        return item
 
-    def edit_{{ table_name }}(self,req,resp):
+    def edit(self,req,resp):
         try:
             {{ table_name}} = {{ model_name}}.get(id={{ table_name}}_id)
         except {{ model_name}}.DoesNotExist:
             raise falcon.HTTPNotFound(description="The requested resource does not exist",code=falcon.HTTP_404)
 
-        if Request.method == 'POST':
+        if req.method == 'POST':
             form = {{ model_name}}Form(Request._params, obj={{ table_name}})
             if form.validate():
                 form.populate_obj({{ table_name}})
                 {{ table_name}}.save()
+                return 'sucess'
+            else:
+                raise falcon.HTTPInvalidParam(msg='form invalid', param_name='controllers/{{table_name}}.py')
         else:
-            form = {{ model_name}}Form(obj={{ table_name}})
+            raise falcon.HTTPMethodNotAllowed(['POST'])
 
-        template = env.get_template('templates/{{ table_name }}/form.html')
-        return template.render(form=form, {{ table_name}}={{ table_name}})
-
-    def delete_{{ table_name }}(self,req,resp):
+    def delete(self,req,resp):
         item = {{ model_name }}.get({{ model_name }}.id == {{ table_name }}_id)
         item.delete_instance()
         return json.dumps({
@@ -229,30 +177,14 @@ class {{ table_name }}:
             os.makedirs(view_dir)
         from model import *
         mode_class = eval(model_name)
-        EntryForm = model_form(mode_class)
+        converter = ModelConverter()
+        EntryForm = model_form(mode_class,converter=converter)
         form = EntryForm()
+        fields = self.table_data[table].get('fields')
         t = Template(self.view_template)
-        content = t.render(table_name=table,model_name=model_name,form=form)
+        content = t.render(table_name=table,model_name=model_name,form=form,fields=fields)
         with open(view_file, 'w+') as fout:
             fout.writelines(content)
-
-    # def gen_forms(self):
-    #     for table in self.table_data:
-    #         model_name = self.table_data.get(table).get('class_name')
-    #         self.gen_form(table,model_name)
-    #
-    # def gen_form(self,table,model_name):
-    #     form_file = output_dir + '/forms/' + table + '.py'
-    #     form_fields = []
-    #     fields = self.table_data.get(table)
-    #     for item in fields['fields']:
-    #         field_name = item.keys()[0]
-    #         field_type = field_type_to_wtforms[item[field_name]['raw_column_type']].__name__
-    #         form_fields.append({'name': field_name, 'type_': field_type})
-    #     if os.path.exists(os.path.dirname(form_file)) is False:
-    #         os.makedirs(os.path.dirname(form_file))
-    #     with open(form_file,'w+') as fout:
-    #         fout.writelines(self.render(model_name,form_fields))
 
     def render(self, table, form_fields):
         t = Template(self.form_header + self.form_template)
