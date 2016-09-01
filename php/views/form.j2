@@ -1,0 +1,103 @@
+
+
+          <div class="modal fade" tabindex="-1" role="dialog" id="{{table_name}}_form">
+                <div class="modal-dialog modal-dialog-confrim" role="document">
+                    <div class="modal-content">
+                        <div class="modal-body">
+                            <form method="post" id="{{ table_name }}_form">
+                                {% for field in form %}
+                                  <p>{{ field.label }} : {{ field }}</p>
+                                {% endfor %}
+                                <p><button type="submit">Submit</button></p>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+          </div>
+
+
+          <div class="mz-body-right">
+                <div class="panel panel-default">
+                    <div class="panel-heading noline">
+                        <h3 class="panel-title">{{model_name}}</h3>
+                    </div>
+
+		    <div class="panel-body" style="position:relative">
+                    	<form id="search_form">
+        			name：<input type="text" name="name" />
+        			phone：<input type="text" name="phone" />
+        			<button id="btn_search" type="button">搜索</button>
+    			</form>
+		    </div>
+
+                    <div class="panel-body" style="position:relative">
+                        <table class="table table-striped" id="table">
+                            <thead>
+                                <tr>
+                                    <th><label class="checkbox"><input type="checkbox" id="checkAll"><i></i></label></th>
+                                    {% for field in form %}
+                                    <th>{{ field.description }}</th>
+                                    {% endfor %}
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="list_body">
+
+                            </tbody>
+                        </table>
+                        <nav class="mz-text-right pagination" id="pagination">
+                        </nav>
+
+                        <div class="toolbox" id="toolbox">
+                            <p class="tip">你已经选择 <b id="tip_num"></b> 项</p>
+                            <button type="button" class="btn btn-danger" data-dismiss="modal">删除</button>
+                        </div>
+
+
+                    </div>
+                </div>
+            </div>
+            <div class="mz-clear"></div>
+
+            <div class="modal fade" tabindex="-1" role="dialog" id="delModal">
+                <div class="modal-dialog modal-dialog-confrim" role="document">
+                    <div class="modal-content">
+                        <div class="modal-body">
+                            你确定要删除吗？
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-cancel" data-dismiss="modal">取消</button>
+                            <button type="button" class="btn btn-danger" id="delModal-del" data-id="" data-dismiss="modal">删除</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" tabindex="-1" role="dialog" id="tipsModal">
+                <div class="modal-dialog modal-dialog-confrim" role="document">
+                    <div class="modal-content">
+                        <div class="modal-body" id="tipsModal-modal-body">
+                            操作成功
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal fade" tabindex="-1" role="dialog" id="detailModal">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                            <h4 class="modal-title">详情</h4>
+                        </div>
+                        <div class="modal-body" style="min-height: 350px;padding-top: 50px;">
+                            <div style="padding-left:100px;" id ="msg_content">
+
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-default" data-dismiss="modal">返回</button>
+                            <button type="button" class="btn btn-danger" id="detailModal-del" data-id="" data-dismiss="modal">删除</button>
+                        </div>
+                    </div>
+                </div>
+            </div>

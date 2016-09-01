@@ -71,6 +71,22 @@ class Generator:
         self.nav = {}
         self.popmenu = {}
         self.gen_common()
+        self.create_model_file()
+
+    def create_model_file(self):
+        self.model_file = 'model/__init__.py'
+        if db_config.get('password') != '':
+            cmd = '''python -m pwiz -e mysql -u%s -H%s -P%s -p%s %s> %s''' % (
+                db_config.get('user'), db_config.get('host'),
+                db_config.get('password'), db_config.get('port'), db_name,
+                self.model_file)
+        else:
+            cmd = '''python -m pwiz -e mysql -u%s -H%s -p%s %s> %s''' % (
+                db_config.get('user'), db_config.get('host'),
+                db_config.get('port'), db_name, self.model_file)
+        rc, stdout, stderr = exec_cmd(cmd)
+        if rc != 0:
+            raise Exception(stderr)
 
     def add_header_top(self,header_top):
         '''
@@ -92,62 +108,6 @@ class Generator:
         :param header_top: dict 类似 {'http://www.qq.com':'qq'}
         '''
         self.popmenu.update(popmenu)
-
-    def gen_models(self):
-        models_dir = output_dir + '/models/'
-        model_file = models_dir + db_name + '.py'
-        if os.path.exists(models_dir) is False:
-            os.makedirs(models_dir)
-        if db_config.get('password') != '':
-            cmd = '''python -m pwiz -e mysql -u%s -H%s -P%s -p%s %s> %s''' % (
-                db_config.get('user'), db_config.get('host'),
-                db_config.get('password'), db_config.get('port'), db_name,
-                model_file)
-        else:
-            cmd = '''python -m pwiz -e mysql -u%s -H%s -p%s %s> %s''' % (
-                db_config.get('user'), db_config.get('host'),
-                db_config.get('port'), db_name, model_file)
-        rc, stdout, stderr = exec_cmd(cmd)
-        if rc != 0:
-            raise Exception(stderr)
-        shutil.copy(model_file,'model/__init__.py')
-        db_conf_file = output_dir + '/configs/db.py'
-        if os.path.exists(output_dir + '/configs') is False:
-            os.makedirs(output_dir + '/configs')
-        with open(db_conf_file, 'w+') as fp:
-            fp.write('db_config = %s' % json.dumps(db_config))
-        with open(model_file, 'r+') as fp:
-            content = fp.readlines()
-            content[1] = "from configs.db import * \n"
-            content[2] = "database = MySQLDatabase('%s', **db_config) \n" % db_name
-        with open(model_file, 'w+') as fp:
-            fp.writelines(content)
-
-    #admin & resutful
-    def gen_controllers(self):
-        for table in self.table_data:
-            model_name = self.table_data.get(table).get('class_name')
-            self.gen_controller(table, model_name)
-
-    def gen_controller(self, table, model_name):
-        controller_file = output_dir + '/controllers/' + table + '.py'
-        t = Template(self.controller_template)
-        controller_content = t.render(db_name=db_name,
-                                      table_name=table,
-                                      model_name=model_name)
-        if os.path.exists(os.path.dirname(controller_file)) is False:
-            os.makedirs(os.path.dirname(controller_file))
-        with open(controller_file, 'w+') as fout:
-            fout.writelines(controller_content)
-
-    #list include curd form views
-    def gen_views(self):
-        for table in self.table_data:
-            model_name = self.table_data.get(table).get('class_name')
-            self.gen_view(table,model_name)
-        #还原 model/__init__.py
-        with(open('model/__init__.py','w+')) as fout:
-            fout.write('')
 
     def gen_common(self):
         view_dir = output_dir + '/views/common'
@@ -185,7 +145,27 @@ class Generator:
                 footer_content = fp.read()
         self.footer_content = footer_content
 
+    def gen_alls(self):
+        for table in self.table_data:
+            model_name = self.table_data.get(table).get('class_name')
+            self.gen_one(table,model_name)
+        #还原 model/__init__.py
+        with(open('model/__init__.py','w+')) as fout:
+            fout.write('')
+
+    def gen_one(self,table,model_name):
+        self.gen_ctr_model(table,model_name)
+        self.gen_view(table,model_name)
+
+    def gen_ctr_model(self,table,model_name):
+        #生成controller
+
+        #生成model
+
+        pass
+
     def gen_view(self, table, model_name):
+        #生成view
         view_dir = output_dir + '/views/models/'
         view_dir_all = output_dir + '/views/all/'
         view_file = view_dir + table + '.html'
@@ -263,16 +243,12 @@ class Generator:
 
 def gen_all():
     g = Generator(db)
-    g.gen_models()
-    g.gen_controllers()
-    g.gen_views()
+    g.gen_alls()
 
 def gen_table(table):
     g = Generator(db)
     model_name = g.table_data.get(table).get('class_name')
-    g.gen_models()
-    g.gen_controller(table,model_name)
-    g.gen_view(table,model_name)
+    g.gen_one(table,model_name)
 
 if __name__ == '__main__':
     import sys
