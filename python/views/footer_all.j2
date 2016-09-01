@@ -162,13 +162,12 @@
             pageSizeName: 'size',
             remote: {
                 url: '{{table_name}}/search', //{"data":[1,2,3,4,5,6,7,8,9,10],"total":800}
-		        type: "POST",
 		        pageParams: function(data){
                     return {
                         index:data.pageIndex,
                         size:data.pageSize
                     };
-                }
+                },
                 params: $('#search_form').serializeArray(),
                 beforeSend: function(e){
 
