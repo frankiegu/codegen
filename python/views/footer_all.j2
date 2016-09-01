@@ -1,0 +1,153 @@
+        <div class="footer" id="footer">
+
+        </div>
+        <script type="text/javascript">
+            $(function() {
+                var deleteUrl = '{{table_name}}/delete',
+                    addUrl = '{{table_name}}/create',
+                    editUrl = '{{table_name}}/edit',
+                    getUrl = '{{table_name}}/lists';
+                var table = $("#table"),
+                    toolbox = $('#toolbox'),
+                    tips = $('#tips'),
+                    checkAll = table.find('#checkAll'),
+                    checkItem = table.find("td :checkbox"),
+                    delBtn = table.find(".del"),
+                    deleteBtn = $(".modal-footer .btn-danger"),
+                    deletemManyBtn = $("#toolbox .btn-danger"),
+                    defaultBtn = $('#toolbox .btn-default'),
+                    detailBtn = table.find(".detail");
+                //全选
+                checkAll.on("click", function(e) {
+                    table.find(':checkbox').not(this).prop('checked', this.checked);
+                    this.checked ? toolbox.fadeIn('fast') : toolbox.fadeOut('fast');
+                    var checkedItem = table.find('td :checked');
+                    $('#tip_num').html(checkedItem.length)
+                });
+                //单选
+                checkItem.on("change", function(e) {
+                    var checkedItem = table.find('td :checked');
+                    checkAll.prop('checked', checkedItem.length === checkItem.length);
+                    checkedItem.length ? toolbox.fadeIn('fast') : toolbox.fadeOut('fast');
+                    $('#tip_num').html(checkedItem.length)
+                });
+                //显示删除弹窗
+                delBtn.on("click", function(e) {
+                    var id = $(e.currentTarget).attr('data-id')
+                    $('#delModal-del').attr('data-id',id)
+                    $('#delModal').modal({
+                        "keyboard": true,
+                        "show": true
+                    });
+                });
+                //详情
+                detailBtn.on("click", function(e) {
+                    e.stopPropagation()
+                    var id = $(e.currentTarget).attr('data-id')
+                    content = '' //todo
+                    $('#msg_content').html(content)
+                    $('#detailModal').modal({
+                        "keyboard": true,
+                        "show": true
+                    });
+                });
+                var get_check_msg_id = function (e) {
+                    var checkedItem = table.find('td :checked');
+                    msg_id_arr = new Array()
+                    for (var i = 0; i < checkedItem.length; i++) {
+                        id = $(checkedItem[i]).attr('data-id')
+                        msg_id_arr.push(id)
+                    }
+                    msg_ids = msg_id_arr.join(",")
+                    return msg_ids
+                };
+                var tip_show = function (text) {
+                    $('#tipsModal-modal-body').html(text)
+                    $('#tipsModal').modal({
+                        "keyboard": true,
+                        "show": true
+                    });
+                    setTimeout(function (e) {
+                        $('#tipsModal').modal('hide')
+                    }, 1000);
+                };
+                var remove_checked = function (e) {
+                    var checkedItem = table.find('td :checked');
+                    for (var i = 0; i < checkedItem.length; i++) {
+                        $(checkedItem[i]).removeAttr('checked')
+                    }
+                };
+                var tip_sucess="操作成功",
+                    tips_error='操作失败';
+                var ajax = function (url,data,show_tips) {
+                    $.ajax({
+                        type: "POST",
+                        dataType: "json",
+                        url: url,
+                        data: data,
+                        success: function (data) {
+                            if(show_tips != false){
+                                tip_show(tip_sucess)
+                                window.location.reload()
+                            }
+                        },
+                        error: function (data) {
+                            if(show_tips != false){
+                                tip_show(tips_error)
+                            }
+                        }
+                    });
+                };
+                //删除
+                deleteBtn.on("click", function(e) {
+                    var id = $(e.currentTarget).attr('data-id')
+                    ajax(deleteUrl,{'id':id})
+                });
+                //批量删除
+                deletemManyBtn.on("click", function(e) {
+                    id = get_check_msg_id()
+                    ajax(deleteUrl,{'id':id})
+                    toolbox.fadeOut('fast')
+                    remove_checked()
+                });
+
+                //获取某一页列表
+                var list_body = function(page_num,page_count){
+                    $.ajax({
+                        type: "POST",
+                        dataType: "json",
+                        url: getUrl,
+                        data: {'page_num':page_num,'page_count':page_count},
+                        success: function (data) {
+                            if(data.length>1){
+                                html_content = '';
+                                for(item in data){
+                                    html_content += '<tr>'+
+                                                        '<td><label class="checkbox"><input type="checkbox" data-id="'+data[item].{{primary_field}}+'"><i></i></label></td>'+
+                                                        {% for field in form %}'<th>'+data[item].{{ field.field_name }}+'</th>'+
+                                                        {% endfor %}
+                                                        '<td>'+
+                                                            '<a href="#" data-id="'+data[item].{{primary_field}}+'" class="action detail">详情</a>'+
+                                                            '<a href="#" data-id="'+data[item].{{primary_field}}+'" class="action del">删除</a>'+
+                                                        '</td>'+
+                                                    '</tr>';
+                                }
+                            }
+
+                            $('#list_body').html(html_content)
+
+                        },
+                        error: function (data) {
+                            tip_show('获取列表数据出错')
+                        }
+                    });
+                }
+
+                list_body()
+
+            });
+        </script>
+    </div>
+
+</body>
+</html>

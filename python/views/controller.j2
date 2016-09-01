@@ -1,0 +1,58 @@
+# -*- coding:utf8 -*-
+import falcon
+from models.{{ db_name }} import *
+from wtfpeewee.orm import model_form
+from jinja2 import Environment, FileSystemLoader
+env = Environment(loader=FileSystemLoader('views'))
+
+{{ model_name }}Form = model_form({{ model_name }})
+
+class {{ table_name }}:
+    def index(self,req,resp):
+        template = env.get_template('views/{{ table_name }}.html')
+        return template.render()
+
+    def lists(self,req,resp):
+        result = []
+        list_items = {{ model_name}}.select()
+        return result
+
+    def create(self,req,resp):
+        form = {{ model_name }}Form(req._params)
+        if req.method == 'POST':
+            if form.validate():
+                new_item = {{ model_name }}.create(**form.data)
+                return 'sucess'
+            else:
+
+        else:
+            raise falcon.HTTPMethodNotAllowed(['POST'])
+
+    def info(self,req,resp):
+        item = {{ model_name }}.get({{ model_name}}.id == {{ table_name }}_id)
+        return item
+
+    def edit(self,req,resp):
+        try:
+            {{ table_name}} = {{ model_name}}.get(id={{ table_name}}_id)
+        except {{ model_name}}.DoesNotExist:
+            raise falcon.HTTPNotFound(description="The requested resource does not exist",code=falcon.HTTP_404)
+
+        if req.method == 'POST':
+            form = {{ model_name}}Form(Request._params, obj={{ table_name}})
+            if form.validate():
+                form.populate_obj({{ table_name}})
+                {{ table_name}}.save()
+                return 'sucess'
+            else:
+                raise falcon.HTTPInvalidParam(msg='form invalid', param_name='controllers/{{table_name}}.py')
+        else:
+            raise falcon.HTTPMethodNotAllowed(['POST'])
+
+    def delete(self,req,resp):
+        item = {{ model_name }}.get({{ model_name }}.id == {{ table_name }}_id)
+        item.delete_instance()
+        return {
+            'status': 'success',
+            'message': 'Item was deleted'
+        }
