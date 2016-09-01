@@ -21,6 +21,15 @@
                     <div class="panel-heading noline">
                         <h3 class="panel-title">{{model_name}}</h3>
                     </div>
+
+		    <div class="panel-body" style="position:relative">
+                    	<form id="search_form">
+        			name：<input type="text" name="name" />
+        			phone：<input type="text" name="phone" />
+        			<button id="btn_search" type="button">搜索</button>
+    			</form>
+		    </div>
+
                     <div class="panel-body" style="position:relative">
                         <table class="table table-striped" id="table">
                             <thead>
@@ -36,10 +45,7 @@
 
                             </tbody>
                         </table>
-                        <nav class="mz-text-right">
-                            <ul class="pagination">
-                                <li class="active">分页</li>
-                            </ul>
+                        <nav class="mz-text-right pagination" id="pagination">
                         </nav>
 
                         <div class="toolbox" id="toolbox">

@@ -17,6 +17,11 @@ class {{ table_name }}:
         list_items = {{ model_name}}.select()
         return result
 
+    def search(self,req,resp):
+        result = {'total':100,'data':[]}
+        list_items = {{ model_name}}.select()
+        return result
+
     def create(self,req,resp):
         form = {{ model_name }}Form(req._params)
         if req.method == 'POST':
