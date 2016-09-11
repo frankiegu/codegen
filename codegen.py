@@ -123,6 +123,40 @@ class Generator:
         with open(model_file, 'w+') as fp:
             fp.writelines(content)
 
+    def gen_alls(self):
+        for table in self.table_data:
+            model_name = self.table_data.get(table).get('class_name')
+            self.gen_one(table,model_name)
+        #还原 model/__init__.py
+        with(open('model/__init__.py','w+')) as fout:
+            fout.write('')
+
+    def gen_one(self,table,model_name):
+        self.gen_ctr_model(table,model_name)
+        self.gen_view(table,model_name)
+
+    def create_model_file(self):
+        self.model_file = 'model/__init__.py'
+        if db_config.get('password') != '':
+            cmd = '''python -m pwiz -e mysql -u%s -H%s -P%s -p%s %s> %s''' % (
+                db_config.get('user'), db_config.get('host'),
+                db_config.get('password'), db_config.get('port'), db_name,
+                self.model_file)
+        else:
+            cmd = '''python -m pwiz -e mysql -u%s -H%s -p%s %s> %s''' % (
+                db_config.get('user'), db_config.get('host'),
+                db_config.get('port'), db_name, self.model_file)
+        rc, stdout, stderr = exec_cmd(cmd)
+        if rc != 0:
+            raise Exception(stderr)
+
+    def gen_ctr_model(self,table,model_name):
+        #生成controller
+
+        #生成model
+
+        pass
+
     #admin & resutful
     def gen_controllers(self):
         for table in self.table_data:

@@ -1,5 +1,0 @@
-falcon
-peewee
-wtforms
-wtfpeewee
-Jinja2

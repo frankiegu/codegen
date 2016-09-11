@@ -1,5 +1,5 @@
 falcon
 peewee
+wtforms
+wtfpeewee
 Jinja2
-gunicorn
-simplejson
